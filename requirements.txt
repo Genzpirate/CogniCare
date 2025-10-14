@@ -1,0 +1,7 @@
+Flask
+Flask-SQLAlchemy
+psycopg2-binary
+Flask-Bcrypt
+Flask-Login
+google-generativeai
+python-dotenv

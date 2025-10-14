@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale-1.0">
+    <script src='https://cdn.jsdelivr.net/npm/fullcalendar@6.1.13/index.global.min.js'></script>
+    <title>My Health Calendar - CogniCare</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+    </head>
+<body>
+    <header>
+        <h1>My Health Calendar</h1>
+        <a href="/dashboard.html" style="color: white; text-decoration: none;">Back to Dashboard</a>
+    </header>
+
+    <main>
+        <div id="calendar"></div>
+        <div class="analysis-section">
+    <button id="analyze-button">Analyze My Health Trends</button>
+    <div id="analysis-result">
+        </div>
+</div>
+    </main>
+
+    <script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // --- Get HTML Elements ---
+        const calendarEl = document.getElementById('calendar');
+        const modal = document.getElementById('log-modal');
+        const cancelButton = document.getElementById('cancel-button');
+        const logForm = document.getElementById('log-form');
+        const modalDateEl = document.getElementById('modal-date');
+        const logDateInput = document.getElementById('log-date-input');
+
+        // --- Initialize FullCalendar ---
+        const calendar = new FullCalendar.Calendar(calendarEl, {
+            initialView: 'dayGridMonth',
+            headerToolbar: {
+                left: 'prev,next today',
+                center: 'title',
+                right: 'dayGridMonth,timeGridWeek'
+            },
+            dateClick: function(info) {
+                modalDateEl.innerText = `Log Health Info for: ${info.dateStr}`;
+                logDateInput.value = info.dateStr;
+                modal.style.display = 'flex';
+            },
+            // --- THIS IS THE NEW PART THAT FETCHES AND DISPLAYS THE DOTS ---
+            events: function(fetchInfo, successCallback, failureCallback) {
+                // Get the year and month of the current calendar view
+                const year = fetchInfo.start.getFullYear();
+                const month = fetchInfo.start.getMonth() + 1; // Month is 0-indexed
+
+                // Fetch the symptoms from our new backend endpoint
+                fetch(`/get_symptoms?year=${year}&month=${month}`)
+                    .then(response => response.json())
+                    .then(data => {
+                        successCallback(data); // Give the data to the calendar to display
+                    })
+                    .catch(error => {
+                        console.error('Error fetching symptoms:', error);
+                        failureCallback(error);
+                    });
+            }
+        });
+        calendar.render();
+
+        const analyzeButton = document.getElementById('analyze-button');
+const analysisResult = document.getElementById('analysis-result');
+
+analyzeButton.addEventListener('click', async function() {
+    // Show a loading message
+    analysisResult.style.display = 'block';
+    analysisResult.innerText = 'Analyzing your health trends, please wait...';
+
+    try {
+        // Call our new backend endpoint
+        const response = await fetch('/analyze_trends', {
+            method: 'POST'
+        });
+        const result = await response.json();
+
+        // Display the AI's analysis
+        analysisResult.innerText = result.analysis;
+    } catch (error) {
+        console.error('Error fetching analysis:', error);
+        analysisResult.innerText = 'Sorry, an error occurred while analyzing your data.';
+    }
+});
+
+        // --- Event Listeners for the Modal ---
+        cancelButton.addEventListener('click', () => modal.style.display = 'none');
+        window.addEventListener('click', (event) => {
+            if (event.target == modal) modal.style.display = 'none';
+        });
+
+        // Handle the form submission
+        logForm.addEventListener('submit', async function(event) {
+            event.preventDefault();
+            const formData = new FormData(logForm);
+            const data = Object.fromEntries(formData.entries());
+
+            try {
+                const response = await fetch('/log_symptom', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+                const result = await response.json();
+                
+                if (response.ok) {
+                    alert(result.message);
+                    modal.style.display = 'none';
+                    logForm.reset();
+                    calendar.refetchEvents(); // <-- This tells the calendar to refresh its dots!
+                } else {
+                    alert('Error: ' + result.message);
+                }
+            } catch (error) {
+                console.error('Error logging symptom:', error);
+                alert('Failed to log symptom.');
+            }
+        });
+    });
+</script>
+
+<div id="log-modal" class="modal-overlay">
+    <div class="modal-content">
+        <h3 id="modal-date">Log Health Info for: </h3>
+        <form id="log-form">
+            <input type="hidden" id="log-date-input" name="log_date">
+            
+            <label for="symptom">Symptom:</label>
+            <select id="symptom" name="symptom" required>
+                <option value="Headache">Headache</option>
+                <option value="Fever">Fever</option>
+                <option value="Cough">Cough</option>
+                <option value="Fatigue">Fatigue</option>
+                <option value="Stomach Ache">Stomach Ache</option>
+                <option value="Other">Other</option>
+            </select>
+            
+            <label for="severity">Severity:</label>
+            <select id="severity" name="severity" required>
+                <option value="Mild">Mild</option>
+                <option value="Moderate">Moderate</option>
+                <option value="Severe">Severe</option>
+            </select>
+
+            <label for="notes">Notes:</label>
+            <textarea id="notes" name="notes" rows="3" placeholder="e.g., Felt this after lunch..."></textarea>
+            
+            <div class="modal-buttons">
+                <button type="submit">Save Log</button>
+                <button type="button" id="cancel-button">Cancel</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+    </body>
+</html>

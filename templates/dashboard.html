@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard - CogniCare</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+    <header>
+        <h1>Welcome to your CogniCare Dashboard!</h1>
+        <button id="logoutButton">Logout</button>
+    </header>
+
+    <main>
+
+        <div class="dashboard-widget">
+            <h3>My Health Calendar</h3>
+            <p>Track symptoms and view your health trends over time.</p>
+            <a href="/calendar.html"><button>Open Calendar</button></a>
+        </div>
+        <div id="chat-container">
+            <div id="chat-history">
+                <div class="bot-message">Hello! I'm CogniCare. How can I help you with your health questions today?</div>
+            </div>
+            <form id="chat-form">
+                <input type="text" id="message-input" placeholder="Ask a health question..." required>
+                <button type="submit">Send</button>
+            </form>
+        </div>
+        </main>
+
+    <script src="/static/js/auth.js"></script>
+    <script src="/static/js/chat.js"></script>
+</body>
+</html>
