@@ -10,6 +10,11 @@ import google.generativeai as genai
 from dotenv import load_dotenv
 load_dotenv() # This loads the variables from your .env file
 
+
+from flask import Flask, request, jsonify, render_template
+import datetime # <-- Add this line
+import random
+import json
 # Create our main application, like starting a new company
 app = Flask(__name__)
 
@@ -33,9 +38,52 @@ def index():
 def register_page():
     return render_template('register.html')
 
+
+# --- CHECKLIST ADD ITEM ROUTE ---
+@app.route('/add_checklist_item', methods=['POST'])
+@login_required
+def add_checklist_item():
+    # 1. Get the text content from the JavaScript form
+    data = request.get_json()
+    content = data.get('content')
+
+    if not content:
+        return jsonify({'message': 'Content cannot be empty.'}), 400
+
+    # 2. Create the new item linked to the current user
+    new_item = ChecklistItem(
+        user_id=current_user.id,
+        content=content,
+        is_completed=False
+    )
+    
+    # 3. Add to database and save
+    db.session.add(new_item)
+    db.session.commit()
+    
+    # 4. Send the new item's data back to the frontend
+    return jsonify({
+        'message': 'Item added!',
+        'item': {
+            'item_id': new_item.item_id,
+            'content': new_item.content,
+            'is_completed': new_item.is_completed
+        }
+    }), 201    
+
 @app.route('/dashboard.html')
+@login_required
 def dashboard_page():
-    return render_template('dashboard.html')
+    health_alert_data = get_local_health_alert()
+    daily_myth_data = get_daily_myth() # <-- This line now calls our new function
+    checklist_items = ChecklistItem.query.filter_by(user_id=current_user.id).order_by(ChecklistItem.created_at).all()
+    
+    return render_template(
+        'dashboard.html', 
+        health_alert=health_alert_data,
+        daily_myth=daily_myth_data,
+        checklist_items=checklist_items  # <-- Pass the items to the HTML
+    )
 
 # Initialize our database and password-scrambler tools
 db = SQLAlchemy(app)
@@ -65,11 +113,101 @@ class SymptomLog(db.Model):
     severity = db.Column(db.String(50))
     notes = db.Column(db.Text)
 
+
+# This class is a "blueprint" for a checklist item.
+class ChecklistItem(db.Model):
+    __tablename__ = 'checklist_items'
+    item_id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    content = db.Column(db.Text, nullable=False)
+    is_completed = db.Column(db.Boolean, default=False)
+    created_at = db.Column(db.TIMESTAMP(timezone=True), default=db.func.current_timestamp())
+
+
     # --- USER LOADER ---
 # This function helps Flask-Login understand how to find a specific user from our database.
 @login_manager.user_loader
 def load_user(user_id):
-    return User.query.get(int(user_id))
+    return db.session.get(User, int(user_id))
+
+#2.  Stick to common wellness, nutrition, or everyday health topics.
+#Your task is to generate one common, safe, and verifiable health "myth" and its corresponding "fact".
+#1.  Do not discuss severe diseases, medications, or life-threatening conditions.
+
+def get_daily_myth():
+    """
+    Generates a new myth/fact by calling the Gemini API.
+    This version does NOT use a JSON file.
+    """
+    try:
+        # 1. Create a prompt to generate a health myth and fact
+        prompt = f"""
+        You are CogniCare, a health awareness AI.
+        Your task is to generate one verifiable health "myth" and its corresponding "fact".
+        
+        RULES:
+        1.  The "fact" must be widely accepted scientific knowledge and random.
+        2.  You MUST format your response with "MYTH:" and "FACT:" as separators.
+        
+        Example:
+        MYTH: Cracking your knuckles will give you arthritis.
+        FACT: Fact: There is no scientific evidence to support this. The 'pop' sound is just gas bubbles bursting in your joint fluid.
+
+        Generate a new one now.
+        """
+
+        # 2. Call the Gemini API
+        model = genai.GenerativeModel('gemini-2.5-flash')
+        response = model.generate_content(prompt)
+        ai_choice_text = response.text
+
+        # 3. Parse the AI's response
+        if "FACT:" in ai_choice_text and "MYTH:" in ai_choice_text:
+            parts = ai_choice_text.split("FACT:", 1)
+            selected_myth = parts[0].replace("MYTH:", "").strip()
+            selected_fact = "Fact: " + parts[1].strip()
+            
+            return {
+                "myth": selected_myth,
+                "fact": selected_fact
+            }
+        else:
+            # If the AI formatted it weirdly, raise an error to use the fallback
+            raise Exception("AI response format was not as expected.")
+
+    except Exception as e:
+        # --- Fallback in case the API fails or has an error ---
+        print(f"Error calling AI for myth: {e}. Falling back to a hardcoded default.")
+        # We will use one single, safe, hardcoded myth as a fallback
+        return {
+            "myth": "Going out in the cold weather will give you a cold.",
+            "fact": "Fact: Colds are caused by viruses, not by cold air. You get sick by being exposed to a virus, often indoors."
+        }
+
+
+
+def get_local_health_alert():
+    """
+    Simulates a local health alert API for Bengaluru.
+    """
+    current_month = datetime.datetime.now().month
+
+    # Post-monsoon season (Aug to Nov) is high-risk for Dengue
+    if current_month >= 8 and current_month <= 11:
+        alert = {
+            'level': 'High Risk',
+            'illness': 'Dengue Fever',
+            'message': 'Post-monsoon season is a peak time for Dengue. Ensure no stagnant water is near your home.',
+            'color_class': 'alert-orange' # CSS class we will create
+        }
+    else:
+        alert = {
+            'level': 'Low Risk',
+            'illness': 'General Alert',
+            'message': 'Health risks are currently low. Continue to follow good hygiene practices.',
+            'color_class': 'alert-green'
+        }
+    return alert
 
 
 # --- USER LOGIN ROUTE ---
@@ -282,6 +420,35 @@ def analyze_trends():
         analysis_text = "Sorry, I was unable to analyze your trends at this time."
 
     return jsonify({'analysis': analysis_text})
+
+
+# --- CHECKLIST UPDATE ITEM ROUTE (for checking the box) ---
+@app.route('/update_checklist_item/<int:item_id>', methods=['POST'])
+@login_required
+def update_checklist_item(item_id):
+    item = db.session.get(ChecklistItem, item_id) # Modern syntax
+    
+    if not item or item.user_id != current_user.id:
+        return jsonify({'message': 'Item not found.'}), 404
+        
+    data = request.get_json()
+    item.is_completed = data.get('is_completed')
+    
+    db.session.commit()
+    return jsonify({'message': 'Item updated!'}), 200
+
+# --- CHECKLIST DELETE ITEM ROUTE ---
+@app.route('/delete_checklist_item/<int:item_id>', methods=['POST'])
+@login_required
+def delete_checklist_item(item_id):
+    item = db.session.get(ChecklistItem, item_id) # Modern syntax
+    
+    if not item or item.user_id != current_user.id:
+        return jsonify({'message': 'Item not found.'}), 404
+        
+    db.session.delete(item)
+    db.session.commit()
+    return jsonify({'message': 'Item deleted!'}), 200   
 
 # This part makes the server run when you execute the file
 if __name__ == '__main__':
