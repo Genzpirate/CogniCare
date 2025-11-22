@@ -1,3 +1,13 @@
+// --- Myth Card Flip Logic ---
+const mythCard = document.getElementById('myth-card');
+
+if (mythCard) {
+    mythCard.addEventListener('click', function() {
+        mythCard.classList.toggle('is-flipped');
+    });
+}
+
+
 // Find all the chat elements on the page
 const chatForm = document.getElementById('chat-form');
 const messageInput = document.getElementById('message-input');
@@ -42,3 +52,33 @@ function appendMessage(message, className) {
     chatHistory.appendChild(messageElement);
     chatHistory.scrollTop = chatHistory.scrollHeight; // Auto-scroll to the bottom
 }
+
+// --- Async Myth Loader ---
+document.addEventListener('DOMContentLoaded', async function() {
+    const mythLoading = document.getElementById('myth-loading');
+    const mythContent = document.getElementById('myth-content');
+    const mythHint = document.getElementById('myth-hint');
+    const factContent = document.getElementById('fact-content');
+
+    // Only run if the myth card exists on this page
+    if (mythLoading) {
+        try {
+            // 1. Call our new internal API
+            const response = await fetch('/api/get_myth');
+            const data = await response.json();
+
+            // 2. Update the HTML with the data
+            mythContent.innerText = `"${data.myth}"`;
+            factContent.innerText = data.fact;
+
+            // 3. Hide loader and show content
+            mythLoading.style.display = 'none';
+            mythContent.style.display = 'block';
+            mythHint.style.display = 'block';
+
+        } catch (error) {
+            console.error('Error fetching myth:', error);
+            mythLoading.innerHTML = '<p>Failed to load myth.</p>';
+        }
+    }
+});

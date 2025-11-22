@@ -8,72 +8,81 @@
 </head>
 <body>
     <header>
-        <h1>Welcome to your CogniCare Dashboard!</h1>
-        <button id="logoutButton">Logout</button>
+        <h1>CogniCare</h1>
+        <div style="display: flex; align-items: center; gap: 1rem;">
+            <span style="color: #718096;">Welcome, {{ current_user.name }}</span>
+            <button id="logoutButton">Logout</button>
+        </div>
     </header>
 
     <main>
-
-        <div class="alert-widget {{ health_alert.color_class }}">
-            <h3>{{ health_alert.level }}: {{ health_alert.illness }} (Bengaluru)</h3>
-            <p>{{ health_alert.message }}</p>
-        </div>
-
-        <div class="myth-card" id="myth-card">
-    <div class="card-inner">
-        <div class="card-front">
-            <h3>Myth of the Day</h3>
-            <p>{{ daily_myth.myth }}</p>
-            <small>Click to reveal the fact</small>
-        </div>
-        <div class="card-back">
-            <h3>The Fact</h3>
-            <p>{{ daily_myth.fact }}</p>
-        </div>
-    </div>
-</div>
-
-        <div class="dashboard-widget">
-            <h3>My Health Calendar</h3>
-            <p>Track symptoms and view your health trends over time.</p>
-            <a href="/calendar.html"><button>Open Calendar</button></a>
-        </div>
-
-        <div class="dashboard-widget">
-    <h3>My Health Checklist</h3>
-    <ul id="checklist">
-        {% for item in checklist_items %}
-            <li data-id="{{ item.item_id }}">
-        <input type="checkbox" {% if item.is_completed %}checked{% endif %}>
-        <span>{{ item.content }}</span>
-        <button>&times;</button>
-             </li>
-           
-        {% endfor %}
-    </ul>
-    
-    <form id="checklist-form">
-        <input type="text" id="checklist-input" placeholder="Add a new health goal...">
-        <button type="submit">Add</button>
-    </form>
-</div>
-        <div id="chat-container">
+        <section id="chat-container">
             <div id="chat-history">
-                <div class="bot-message">Hello! I'm CogniCare. How can I help you with your health questions today?</div>
+                <div class="bot-message">Hello {{ current_user.name }}! I'm CogniCare. How can I help you with your health today?</div>
             </div>
             <form id="chat-form">
-                <input type="text" id="message-input" placeholder="Ask a health question..." required>
+                <input type="text" id="message-input" placeholder="Type a health question..." autocomplete="off" required>
                 <button type="submit">Send</button>
             </form>
-        </div>
-        </main>
+        </section>
+
+        <aside class="widgets-area">
+            
+            <div class="alert-widget {{ health_alert.color_class }}">
+                <h3>{{ health_alert.illness }}</h3>
+                <p>{{ health_alert.message }}</p>
+            </div>
+
+            <div class="myth-card" id="myth-card">
+                <div class="card-inner">
+                    <div class="card-front">
+                <h3>Myth or Fact?</h3>
+            
+                 <div id="myth-loading" style="display: flex; flex-direction: column; align-items: center;">
+                        <div class="spinner"></div>
+                <p style="font-size: 0.9rem; color: #718096;">Asking AI for a myth...</p>
+                     </div>
+
+                  <p id="myth-content" style="font-size: 1.1rem; display: none;"></p>
+                 <small id="myth-hint" style="color: #718096; margin-top: 1rem; display: none;">Click to flip</small>
+                 </div>
+        
+                        <div class="card-back">
+                    <h3>The Fact</h3>
+                     <p id="fact-content"></p>
+                        </div>
+                 </div>
+            </div>
+
+            <div class="dashboard-widget" style="text-align: center;">
+                <h3 style="margin-top: 0;">My Health Calendar</h3>
+                <p style="font-size: 0.9rem; color: #718096; margin-bottom: 1rem;">Track symptoms & view trends</p>
+                <a href="/calendar.html"><button class="calendar-btn">Open Calendar</button></a>
+            </div>
+
+            <div class="dashboard-widget">
+                <h3 style="margin-top: 0;">Daily Checklist</h3>
+                <ul id="checklist">
+                    {% for item in checklist_items %}
+                        <li data-id="{{ item.item_id }}" class="{% if item.is_completed %}completed{% endif %}">
+                            <input type="checkbox" {% if item.is_completed %}checked{% endif %}>
+                            <span>{{ item.content }}</span>
+                            <button>&times;</button>
+                        </li>
+                    {% endfor %}
+                </ul>
+                
+                <form id="checklist-form">
+                    <input type="text" id="checklist-input" placeholder="New goal...">
+                    <button type="submit" style="background: var(--primary-color); color: white; border: none; border-radius: 6px; padding: 0 1rem;">+</button>
+                </form>
+            </div>
+
+        </aside>
+    </main>
 
     <script src="/static/js/auth.js"></script>
     <script src="/static/js/chat.js"></script>
-
-    <script src="/static/js/auth.js"></script>
-    <script src="/static/js/chat.js"></script>
-    <script src="/static/js/checklist.js"></script> </body>
-</html>
+    <script src="/static/js/checklist.js"></script>
 </body>
 </html>

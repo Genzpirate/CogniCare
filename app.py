@@ -75,13 +75,13 @@ def add_checklist_item():
 @login_required
 def dashboard_page():
     health_alert_data = get_local_health_alert()
-    daily_myth_data = get_daily_myth() # <-- This line now calls our new function
+    #daily_myth_data = get_daily_myth() # <-- This line now calls our new function
     checklist_items = ChecklistItem.query.filter_by(user_id=current_user.id).order_by(ChecklistItem.created_at).all()
     
     return render_template(
         'dashboard.html', 
         health_alert=health_alert_data,
-        daily_myth=daily_myth_data,
+        #daily_myth=daily_myth_data,
         checklist_items=checklist_items  # <-- Pass the items to the HTML
     )
 
@@ -146,7 +146,7 @@ def get_daily_myth():
         Your task is to generate one verifiable health "myth" and its corresponding "fact".
         
         RULES:
-        1.  The "fact" must be widely accepted scientific knowledge and random.
+        1.  The "fact" must be accepted scientific knowledge, super random and can be popular.
         2.  You MUST format your response with "MYTH:" and "FACT:" as separators.
         
         Example:
@@ -334,36 +334,36 @@ def log_symptom():
 
 
 # --- FETCH SYMPTOMS ROUTE ---
+# In app.py
+
 @app.route('/get_symptoms', methods=['GET'])
 @login_required
 def get_symptoms():
-    # Get the month and year from the request, sent by the calendar
-    year = request.args.get('year', type=int)
-    month = request.args.get('month', type=int)
+    # (We are keeping date filtering commented out as per your request to see all history)
+    # year = request.args.get('year', type=int)
+    # month = request.args.get('month', type=int)
 
-    # Query the database for symptoms for the current user in the given month and year
     symptoms = SymptomLog.query.filter(
-        SymptomLog.user_id == current_user.id,
-        #extract('year', SymptomLog.log_date) == year,
-        #extract('month', SymptomLog.log_date) == month
+        SymptomLog.user_id == current_user.id
     ).all()
 
-    # Format the data into a list that the calendar library can understand
     events = []
     for symptom in symptoms:
-        color = '#F5A623' # Default Orange for Moderate
+        color = '#F5A623' # Default Orange (Moderate)
         if symptom.severity == 'Mild':
             color = '#7ED321' # Green
         elif symptom.severity == 'Severe':
             color = '#D0021B' # Red
 
         events.append({
+            'id': symptom.log_id, # Passing ID is good practice
             'title': symptom.symptom_name,
             'start': symptom.log_date.isoformat(),
             'color': color,
+            # IMPORTANT: This puts the notes where JavaScript can find them
             'extendedProps': {
-                'notes': symptom.notes,
-                'severity': symptom.severity
+                'severity': symptom.severity,
+                'notes': symptom.notes 
             }
         })
 
@@ -449,6 +449,14 @@ def delete_checklist_item(item_id):
     db.session.delete(item)
     db.session.commit()
     return jsonify({'message': 'Item deleted!'}), 200   
+
+
+@app.route('/api/get_myth')
+@login_required
+def get_myth_api():
+    # This is where the slow AI call happens now
+    data = get_daily_myth() 
+    return jsonify(data)
 
 # This part makes the server run when you execute the file
 if __name__ == '__main__':

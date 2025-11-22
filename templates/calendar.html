@@ -9,8 +9,14 @@
     </head>
 <body>
     <header>
-        <h1>My Health Calendar</h1>
-        <a href="/dashboard.html" style="color: white; text-decoration: none;">Back to Dashboard</a>
+        <div style="display: flex; align-items: center; gap: 1rem;">
+            <a href="/dashboard.html" style="text-decoration: none;">
+                <button style="background: transparent; border: 1px solid var(--text-light); color: var(--text-dark); padding: 0.5rem 1rem; border-radius: var(--radius); cursor: pointer;">
+                    ← Back to Dashboard
+                </button>
+            </a>
+            <h1 style="margin-left: 1rem;">My Health Calendar</h1>
+        </div>
     </header>
 
     <main>
@@ -24,15 +30,18 @@
 
     <script>
     document.addEventListener('DOMContentLoaded', function() {
-        // --- Get HTML Elements ---
         const calendarEl = document.getElementById('calendar');
         const modal = document.getElementById('log-modal');
         const cancelButton = document.getElementById('cancel-button');
         const logForm = document.getElementById('log-form');
         const modalDateEl = document.getElementById('modal-date');
         const logDateInput = document.getElementById('log-date-input');
+        
+        // Get form fields to populate them later
+        const symptomSelect = document.getElementById('symptom');
+        const severitySelect = document.getElementById('severity');
+        const notesInput = document.getElementById('notes');
 
-        // --- Initialize FullCalendar ---
         const calendar = new FullCalendar.Calendar(calendarEl, {
             initialView: 'dayGridMonth',
             headerToolbar: {
@@ -40,61 +49,71 @@
                 center: 'title',
                 right: 'dayGridMonth,timeGridWeek'
             },
+            
+            // 1. Clicking an EMPTY DATE (Add New)
             dateClick: function(info) {
+                // Reset the form to be blank
+                logForm.reset();
+                
+                // Set the date and title
                 modalDateEl.innerText = `Log Health Info for: ${info.dateStr}`;
                 logDateInput.value = info.dateStr;
+                
                 modal.style.display = 'flex';
             },
-            // --- THIS IS THE NEW PART THAT FETCHES AND DISPLAYS THE DOTS ---
-            events: function(fetchInfo, successCallback, failureCallback) {
-                // Get the year and month of the current calendar view
-                const year = fetchInfo.start.getFullYear();
-                const month = fetchInfo.start.getMonth() + 1; // Month is 0-indexed
 
-                // Fetch the symptoms from our new backend endpoint
-                fetch(`/get_symptoms?year=${year}&month=${month}`)
+            // 2. Clicking an EXISTING DOT (View Details)
+            eventClick: function(info) {
+                // Prevent the browser from following links (if any)
+                info.jsEvent.preventDefault(); 
+                
+                const eventObj = info.event;
+                const props = eventObj.extendedProps;
+
+                // Update Title
+                modalDateEl.innerText = `View Log for: ${eventObj.startStr}`;
+                logDateInput.value = eventObj.startStr;
+
+                // POPULATE THE FIELDS
+                // 1. Symptom Name (Title)
+                symptomSelect.value = eventObj.title;
+                
+                // 2. Severity (from extendedProps)
+                if(props.severity) {
+                    severitySelect.value = props.severity;
+                }
+
+                // 3. Notes (from extendedProps) - THIS SOLVES YOUR ISSUE
+                if(props.notes) {
+                    notesInput.value = props.notes;
+                } else {
+                    notesInput.value = '';
+                }
+
+                modal.style.display = 'flex';
+            },
+
+            // Fetching data
+            events: function(fetchInfo, successCallback, failureCallback) {
+                fetch(`/get_symptoms`)
                     .then(response => response.json())
-                    .then(data => {
-                        successCallback(data); // Give the data to the calendar to display
-                    })
+                    .then(data => successCallback(data))
                     .catch(error => {
                         console.error('Error fetching symptoms:', error);
                         failureCallback(error);
                     });
             }
         });
+        
         calendar.render();
 
-        const analyzeButton = document.getElementById('analyze-button');
-const analysisResult = document.getElementById('analysis-result');
-
-analyzeButton.addEventListener('click', async function() {
-    // Show a loading message
-    analysisResult.style.display = 'block';
-    analysisResult.innerText = 'Analyzing your health trends, please wait...';
-
-    try {
-        // Call our new backend endpoint
-        const response = await fetch('/analyze_trends', {
-            method: 'POST'
-        });
-        const result = await response.json();
-
-        // Display the AI's analysis
-        analysisResult.innerText = result.analysis;
-    } catch (error) {
-        console.error('Error fetching analysis:', error);
-        analysisResult.innerText = 'Sorry, an error occurred while analyzing your data.';
-    }
-});
-
-        // --- Event Listeners for the Modal ---
+        // --- Modal Closing Logic ---
         cancelButton.addEventListener('click', () => modal.style.display = 'none');
         window.addEventListener('click', (event) => {
             if (event.target == modal) modal.style.display = 'none';
         });
 
-        // Handle the form submission
+        // --- Form Submission (Same as before) ---
         logForm.addEventListener('submit', async function(event) {
             event.preventDefault();
             const formData = new FormData(logForm);
@@ -111,16 +130,32 @@ analyzeButton.addEventListener('click', async function() {
                 if (response.ok) {
                     alert(result.message);
                     modal.style.display = 'none';
-                    logForm.reset();
-                    calendar.refetchEvents(); // <-- This tells the calendar to refresh its dots!
+                    calendar.refetchEvents(); // Refresh dots
                 } else {
                     alert('Error: ' + result.message);
                 }
             } catch (error) {
-                console.error('Error logging symptom:', error);
+                console.error('Error:', error);
                 alert('Failed to log symptom.');
             }
         });
+        
+        // Analysis Button Logic (Keep your existing code for this...)
+        const analyzeButton = document.getElementById('analyze-button');
+        const analysisResult = document.getElementById('analysis-result');
+        if(analyzeButton){
+             analyzeButton.addEventListener('click', async function() {
+                analysisResult.style.display = 'block';
+                analysisResult.innerText = 'Analyzing your health trends...';
+                try {
+                    const response = await fetch('/analyze_trends', { method: 'POST' });
+                    const result = await response.json();
+                    analysisResult.innerText = result.analysis;
+                } catch (error) {
+                    analysisResult.innerText = 'Error analyzing data.';
+                }
+            });
+        }
     });
 </script>
 
